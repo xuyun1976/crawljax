@@ -3,6 +3,7 @@ package com.crawljax.core.state;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,6 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.GraphPath;
@@ -113,8 +115,12 @@ public class InMemoryStateFlowGraph implements Serializable, StateFlowGraph {
 	private StateVertex putIfAbsent(StateVertex stateVertix, boolean correctName) {
 		writeLock.lock();
 		try {
-			boolean added = sfg.addVertex(stateVertix);
+			boolean added = false;
+			if (!stateById.containsValue(stateVertix))
+				added = sfg.addVertex(stateVertix);
+			
 			if (added) {
+				saveStateVertex(stateVertix);
 				stateById.put(stateVertix.getId(), stateVertix);
 				int count = stateCounter.incrementAndGet();
 				exitNotifier.incrementNumberOfStates();
@@ -127,6 +133,22 @@ public class InMemoryStateFlowGraph implements Serializable, StateFlowGraph {
 			}
 		} finally {
 			writeLock.unlock();
+		}
+	}
+	
+	private void saveStateVertex(StateVertex state)
+	{
+		try
+		{
+			PrintWriter out = new PrintWriter(String.format("d:\\temp\\output2\\%d.html", state.getId()));
+			out.println("id=" + state.getId());
+			out.println(state.getUrl());
+			out.println(state.getStrippedDom());
+			out.println(((StateVertexImpl)state).getTagDom());
+			out.close();
+		}
+		catch(Exception ex)
+		{
 		}
 	}
 

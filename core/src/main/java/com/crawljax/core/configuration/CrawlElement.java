@@ -82,11 +82,13 @@ public final class CrawlElement {
 	 * @return this CrawlElement
 	 */
 	public CrawlElement withAttribute(String attributeName, String value) {
+		value = value.toUpperCase();
+		
 		if (this.underXpath == null || this.underXpath.isEmpty()) {
-			this.underXpath = "//" + this.tagName + "[@" + attributeName + "='" + value + "']";
+			this.underXpath = "//" + this.tagName + "[translate(@" + attributeName + ",'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')='" + value + "']";
 		} else {
 			this.underXpath =
-			        this.underXpath + " | " + "//" + this.tagName + "[@" + attributeName + "='"
+			        this.underXpath + " | " + "//" + this.tagName + "[translate(@" + attributeName + ",'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')='"
 			                + value + "']";
 		}
 		return this;

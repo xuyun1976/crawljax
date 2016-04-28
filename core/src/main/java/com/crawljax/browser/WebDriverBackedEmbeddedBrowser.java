@@ -26,8 +26,10 @@ import com.crawljax.util.DomUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.io.Files;
+
 import org.openqa.selenium.ElementNotVisibleException;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.NoSuchFrameException;
 import org.openqa.selenium.OutputType;
@@ -270,6 +272,19 @@ public final class WebDriverBackedEmbeddedBrowser implements EmbeddedBrowser {
 			return;
 		}
 	}
+	
+	@Override
+	public void reset()
+	{
+		try
+		{
+			browser.manage().deleteAllCookies();
+		}
+		catch(Exception ex)
+		{
+			LOGGER.error(ex.toString(), ex);
+		}
+	}
 
 	/**
 	 * alert, prompt, and confirm behave as if the OK button is always clicked.
@@ -306,7 +321,7 @@ public final class WebDriverBackedEmbeddedBrowser implements EmbeddedBrowser {
 				} catch (WebDriverException e) {
 					throwIfConnectionException(e);
 					return false;
-				}
+				} 
 				break;
 			case hover:
 				LOGGER.info("Eventype hover called but this isnt implemented yet");
@@ -316,7 +331,33 @@ public final class WebDriverBackedEmbeddedBrowser implements EmbeddedBrowser {
 				return false;
 		}
 
-		Thread.sleep(this.crawlWaitEvent);
+		boolean docReady = false;
+		int count = 0;
+		do
+		{
+			count++;
+			Thread.sleep(this.crawlWaitEvent);
+			
+			try
+			{
+				docReady = String.valueOf(((JavascriptExecutor) browser).executeScript("return document.readyState")).equalsIgnoreCase("complete");
+				LOGGER.info("docReady=" + docReady);
+			}
+			catch (UnhandledAlertException  e) 
+			{
+				try
+				{
+					browser.switchTo().alert().dismiss();
+				}
+				catch(NoAlertPresentException ex)
+				{
+					LOGGER.error(ex.toString(), ex);
+				}
+			}
+			
+		}
+		while (!docReady && count < 3);
+		
 		return true;
 	}
 
@@ -496,10 +537,10 @@ public final class WebDriverBackedEmbeddedBrowser implements EmbeddedBrowser {
 	 *             when javascript execution failed.
 	 */
 	@Override
-	public Object executeJavaScript(String code) throws CrawljaxException {
+	public Object executeJavaScript(String code, Object... params) throws CrawljaxException {
 		try {
 			JavascriptExecutor js = (JavascriptExecutor) browser;
-			return js.executeScript(code);
+			return js.executeScript(code, params);
 		} catch (WebDriverException e) {
 			throwIfConnectionException(e);
 			throw new CrawljaxException(e);
@@ -644,7 +685,7 @@ public final class WebDriverBackedEmbeddedBrowser implements EmbeddedBrowser {
 		}
 	}
 
-	private void switchToFrame(String frameIdentification) throws NoSuchFrameException {
+	public void switchToFrame(String frameIdentification) throws NoSuchFrameException {
 		LOGGER.debug("frame identification: " + frameIdentification);
 
 		if (frameIdentification.contains(".")) {

@@ -8,7 +8,9 @@ import com.crawljax.core.configuration.PreCrawlConfiguration;
 import com.crawljax.core.state.Eventable;
 import com.crawljax.core.state.Identification;
 import com.crawljax.forms.FormInput;
+
 import org.openqa.selenium.ElementNotVisibleException;
+import org.openqa.selenium.NoSuchFrameException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
@@ -31,6 +33,8 @@ public interface EmbeddedBrowser {
 	 *            the URL.
 	 */
 	void goToUrl(URI url);
+	
+	void reset();
 
 	/**
 	 * fires the event.
@@ -104,7 +108,7 @@ public interface EmbeddedBrowser {
 	 * @throws CrawljaxException
 	 *             On error.
 	 */
-	Object executeJavaScript(String script) throws CrawljaxException;
+	Object executeJavaScript(String script, Object... params) throws CrawljaxException;
 
 	/**
 	 * Checks if an element is visible.
@@ -162,5 +166,9 @@ public interface EmbeddedBrowser {
 	 *             if saving screenshots is not supported by the implementing class.
 	 */
 	byte[] getScreenShot() throws CrawljaxException;
+	
+	void switchToFrame(String frameIdentification) throws NoSuchFrameException;
+	
+	WebDriver getBrowser();
 
 }

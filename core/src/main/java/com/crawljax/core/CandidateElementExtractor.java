@@ -221,7 +221,10 @@ public class CandidateElementExtractor {
 			        getNodeListForTagElement(dom, crawl,
 			                checkedElements.getEventableConditionChecker());
 
-			for (Element sourceElement : nodeListForCrawlElement) {
+			for (Element sourceElement : nodeListForCrawlElement) 
+			{
+				if ("INPUT".equalsIgnoreCase(sourceElement.getNodeName()) && "FILE".equalsIgnoreCase(sourceElement.getAttribute("type")))
+					continue;
 				evaluateElement(results, relatedFrame, crawl, sourceElement);
 			}
 		} catch (CrawljaxException e) {

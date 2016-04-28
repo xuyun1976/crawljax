@@ -8,6 +8,8 @@ import java.util.List;
 import javax.inject.Inject;
 import javax.xml.xpath.XPathExpressionException;
 
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -80,65 +82,123 @@ public class FormHandler {
 		}
 	}
 
-	private void handleCheckBoxes(Node element, FormInput input) {
-		for (InputValue inputValue : input.getInputValues()) {
-			String js =
-			        DomUtils.getJSGetElement(XPathHelper.getXPathExpression(element));
+//	private void handleCheckBoxes(Node element, FormInput input) {
+//		for (InputValue inputValue : input.getInputValues()) {
+//			String js =
+//			        DomUtils.getJSGetElement(XPathHelper.getXPathExpression(element));
+//			boolean check;
+//			if (!randomFieldValue) {
+//				check = inputValue.isChecked();
+//			} else {
+//
+//				check = Math.random() >= HALF;
+//			}
+//			String value;
+//			if (check) {
+//				value = "true";
+//			} else {
+//				value = "false";
+//			}
+//			js += "try{ATUSA_element.checked=" + value + ";}catch(e){}";
+//			browser.executeJavaScript(js);
+//
+//		}
+//	}
+	
+	private void handleCheckBoxes(Node element, FormInput input) 
+	{
+		WebElement checkBox = browser.getWebElement(input.getIdentification());
+		
+		for (InputValue inputValue : input.getInputValues()) 
+		{
 			boolean check;
 			if (!randomFieldValue) {
 				check = inputValue.isChecked();
 			} else {
-
 				check = Math.random() >= HALF;
 			}
-			String value;
-			if (check) {
-				value = "true";
-			} else {
-				value = "false";
-			}
-			js += "try{ATUSA_element.checked=" + value + ";}catch(e){}";
-			browser.executeJavaScript(js);
-
+			
+			if (check)
+				checkBox.click();
 		}
 	}
 
-	private void handleRadioSwitches(Node element, FormInput input) {
-		for (InputValue inputValue : input.getInputValues()) {
-			if (inputValue.isChecked()) {
-				String js =
-				        DomUtils.getJSGetElement(XPathHelper
-				                .getXPathExpression(element));
-				js += "try{ATUSA_element.checked=true;}catch(e){}";
-				browser.executeJavaScript(js);
-			}
+//	private void handleRadioSwitches(Node element, FormInput input) {
+//		for (InputValue inputValue : input.getInputValues()) {
+//			if (inputValue.isChecked()) {
+//				String js =
+//				        DomUtils.getJSGetElement(XPathHelper
+//				                .getXPathExpression(element));
+//				js += "try{ATUSA_element.checked=true;}catch(e){}";
+//				browser.executeJavaScript(js);
+//			}
+//		}
+//	}
+	
+	private void handleRadioSwitches(Node element, FormInput input) 
+	{
+		WebElement radio = browser.getWebElement(input.getIdentification());
+		for (InputValue inputValue : input.getInputValues()) 
+		{
+			if (inputValue.isChecked()) 
+				radio.click();
+			
+			break;
 		}
 	}
 
-	private void handleSelectBoxes(Node element, FormInput input) {
-		for (InputValue inputValue : input.getInputValues()) {
-			String js =
-			        DomUtils.getJSGetElement(XPathHelper.getXPathExpression(element));
-			js +=
-			        "try{" + "for(i=0; i<ATUSA_element.options.length; i++){"
-			                + "if(ATUSA_element.options[i].value=='"
-			                + inputValue.getValue()
-			                + "' || ATUSA_element.options[i].text=='"
-			                + inputValue.getValue() + "'){"
-			                + "ATUSA_element.options[i].selected=true;" + "break;"
-			                + "}" + "};" + "}catch(e){}";
-			browser.executeJavaScript(js);
+//	private void handleSelectBoxes(Node element, FormInput input) {
+//		for (InputValue inputValue : input.getInputValues()) {
+//			String js =
+//			        DomUtils.getJSGetElement(XPathHelper.getXPathExpression(element));
+//			js +=
+//			        "try{" + "for(i=0; i<ATUSA_element.options.length; i++){"
+//			                + "if(ATUSA_element.options[i].value=='"
+//			                + inputValue.getValue()
+//			                + "' || ATUSA_element.options[i].text=='"
+//			                + inputValue.getValue() + "'){"
+//			                + "ATUSA_element.options[i].selected=true;" + "break;"
+//			                + "}" + "};" + "}catch(e){}";
+//			browser.executeJavaScript(js);
+//		}
+//	}
+
+	private void handleSelectBoxes(Node element, FormInput input) 
+	{
+		WebElement select = browser.getWebElement(input.getIdentification());
+		
+		for (InputValue inputValue : input.getInputValues())
+		{
+			List<WebElement> options = select.findElements(By.tagName("option"));
+		    for(WebElement option : options){
+		        if(option.getText().equals(inputValue.getValue())) {
+		            option.click();
+		            break;
+		        }
+		    }
+		    
+		    break;
 		}
 	}
-
+	
 	private void handleText(Node element, FormInput input) {
 		String text = input.getInputValues().iterator().next().getValue();
 		if ("".equals(text)) {
 			return;
 		}
-		String js = DomUtils.getJSGetElement(XPathHelper.getXPathExpression(element));
-		js += "try{ATUSA_element.value='" + text + "';}catch(e){}";
-		browser.executeJavaScript(js);
+		
+		try
+		{
+			WebElement webElement = browser.getWebElement(input.getIdentification());
+			webElement.clear();
+			webElement.sendKeys(text);
+		}
+		catch(Exception ex)
+		{
+			//String js = DomUtils.getJSGetElement(XPathHelper.getXPathExpression(element));
+			//js += "try{ATUSA_element.value='" + text + "';}catch(e){}";
+			//browser.executeJavaScript(js);
+		}
 	}
 
 	/**
@@ -153,9 +213,19 @@ public class FormHandler {
 			for (int i = 0; i < nodeList.getLength(); i++) {
 				Node candidate = nodeList.item(i);
 				Node typeAttribute = candidate.getAttributes().getNamedItem("type");
-				if (typeAttribute == null
-				        || (allowedTypes.contains(typeAttribute.getNodeValue()))) {
+				if (typeAttribute == null)
 					nodes.add(nodeList.item(i));
+				else
+				{
+					String type = typeAttribute.getNodeValue();
+					for (String allowedType : allowedTypes)
+					{
+						if (allowedType.equalsIgnoreCase(type))
+						{
+							nodes.add(nodeList.item(i));
+							break;
+						}
+					}
 				}
 			}
 			nodeList = XPathHelper.evaluateXpathExpression(dom, "//TEXTAREA");

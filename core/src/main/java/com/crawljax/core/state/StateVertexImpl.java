@@ -8,14 +8,17 @@ import com.crawljax.util.DomUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableList;
+
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /**
  * The state vertex class which represents a state in the browser. When iterating over the possible
  * candidate elements every time a candidate is returned its removed from the list so it is a one
  * time only access to the candidates.
  */
-class StateVertexImpl implements StateVertex {
+public class StateVertexImpl implements StateVertex {
 
 	private static final long serialVersionUID = 123400017983488L;
 
@@ -26,6 +29,7 @@ class StateVertexImpl implements StateVertex {
 	private String name;
 
 	private ImmutableList<CandidateElement> candidateElements;
+	private String tagDom;
 
 	/**
 	 * Creates a current state without an url and the stripped dom equals the dom.
@@ -58,6 +62,7 @@ class StateVertexImpl implements StateVertex {
 		this.name = name;
 		this.dom = dom;
 		this.strippedDom = strippedDom;
+		this.tagDom = generateTagDom();
 	}
 
 	@Override
@@ -88,8 +93,19 @@ class StateVertexImpl implements StateVertex {
 	@Override
 	public boolean equals(Object object) {
 		if (object instanceof StateVertex) {
-			StateVertex that = (StateVertex) object;
-			return Objects.equal(this.strippedDom, that.getStrippedDom());
+			StateVertexImpl that = (StateVertexImpl) object;
+			//boolean ret = Objects.equal(this.strippedDom, that.getStrippedDom());
+			boolean ret = Objects.equal(this.tagDom, that.getTagDom());
+			
+//			if (ret)
+//				return true;
+//			
+//			if (url.equals(that.getUrl()) && Math.abs(this.strippedDom.length() - that.getStrippedDom().length()) / (float)this.strippedDom.length() < 0.05)
+//				return true;
+//			
+//			return false;
+			
+			return ret;
 		}
 		return false;
 	}
@@ -123,4 +139,68 @@ class StateVertexImpl implements StateVertex {
 		return candidateElements;
 	}
 
+	public String getTagDom() {
+		return tagDom;
+	}
+
+	private String generateTagDom()
+	{
+		try
+		{
+			Document document = getDocument();
+		
+			StringBuffer sb = new StringBuffer();
+			generateTagDom(document, sb);
+		
+			return sb.toString();
+		}
+		catch(Exception ex)
+		{
+			ex.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	private void generateTagDom(Node node, StringBuffer sb)
+	{
+		short nodeType = node.getNodeType();
+		String nodeName = node.getNodeName().toUpperCase();
+		
+		if (nodeType == Node.TEXT_NODE)
+		{
+			String text = node.getNodeValue().replaceAll("[\r\n\t]", "").trim();
+			text = text.replaceAll(" {2,}", " ").trim();
+			if (text.length() > 0)
+				sb.append(text);
+			
+			return;
+		}
+		
+		if (nodeType != Node.DOCUMENT_NODE && nodeType != Node.COMMENT_NODE)
+			sb.append("<").append(nodeName).append(">");
+		
+		NodeList nodes = node.getChildNodes();
+		for (int i = 0; i < nodes.getLength(); i++)
+			generateTagDom(nodes.item(i), sb);
+		
+		if (nodeType != Node.DOCUMENT_NODE && nodeType != Node.COMMENT_NODE)
+			sb.append("</").append(nodeName).append(">");
+	}
+	
+//	private void generateTagDom(Node node, StringBuffer sb)
+//	{
+//		short nodeType = node.getNodeType();
+//		String nodeName = node.getNodeName().toUpperCase();
+//		
+//		if (nodeType != Node.TEXT_NODE && nodeType != Node.DOCUMENT_NODE && nodeType != Node.COMMENT_NODE)
+//			sb.append("<").append(nodeName).append(">");
+//		
+//		NodeList nodes = node.getChildNodes();
+//		for (int i = 0; i < nodes.getLength(); i++)
+//			generateTagDom(nodes.item(i), sb);
+//		
+//		if (nodeType != Node.TEXT_NODE && nodeType != Node.DOCUMENT_NODE && nodeType != Node.COMMENT_NODE)
+//			sb.append("</").append(nodeName).append(">");
+//	}
 }

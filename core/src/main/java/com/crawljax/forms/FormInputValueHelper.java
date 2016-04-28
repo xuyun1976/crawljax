@@ -18,12 +18,14 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 import com.crawljax.browser.EmbeddedBrowser;
 import com.crawljax.condition.eventablecondition.EventableCondition;
 import com.crawljax.core.CandidateElement;
 import com.crawljax.core.configuration.InputSpecification;
 import com.crawljax.core.state.Identification;
+import com.crawljax.core.state.Identification.How;
 import com.crawljax.util.DomUtils;
 import com.crawljax.util.XPathHelper;
 import com.google.common.collect.ImmutableListMultimap;
@@ -259,7 +261,7 @@ public final class FormInputValueHelper {
 			return null;
 		}
 		// CHECK
-		String id = fieldMatches(identification.getValue());
+		String id = fieldMatches(identification, browser, element);
 		FormInput input = new FormInput();
 		input.setType(getElementType(element));
 		input.setIdentification(identification);
@@ -303,16 +305,76 @@ public final class FormInputValueHelper {
 		return input;
 	}
 
-	private String fieldMatches(String fieldName) {
-		for (String field : formFields.keySet()) {
-			Pattern p = Pattern.compile(field, Pattern.CASE_INSENSITIVE);
-			Matcher m = p.matcher(fieldName);
-			if (m.matches()) {
-				return formFields.get(field);
+//	private String fieldMatches(String fieldName) {
+//		for (String field : formFields.keySet()) {
+//			Pattern p = Pattern.compile(field, Pattern.CASE_INSENSITIVE);
+//			Matcher m = p.matcher(fieldName);
+//			if (m.matches()) {
+//				return formFields.get(field);
+//			}
+//		}
+//		return null;
+//	}
+	
+	
+	private String fieldMatches(Identification identification, EmbeddedBrowser browser, Node element) 
+	{
+		String fieldName = identification.getValue();
+		
+		for (String field : formFields.keySet()) 
+		{
+			try
+			{
+				Pattern p = Pattern.compile(field, Pattern.CASE_INSENSITIVE);
+				Matcher m = p.matcher(fieldName);
+				if (m.matches()) {
+					return formFields.get(field);
+				}
 			}
+			catch(Exception e)
+			{}
 		}
+		
+		try 
+		{
+			Document document = DomUtils.asDocument(browser.getStrippedDom());
+			String xpath = XPathHelper.getXPathExpression(element);
+			
+			for (String field : formFields.keySet()) 
+			{
+				try 
+				{
+					NodeList nodeList = XPathHelper.evaluateXpathExpression(document, field);
+						
+					for (int i = 0; i < nodeList.getLength(); i++)
+					{
+						String xpath1 = XPathHelper.getXPathExpression(nodeList.item(i));
+						
+						if (xpath1.equals(xpath))
+						{
+							identification.setHow(How.xpath);
+							identification.setValue(xpath);
+							
+							return formFields.get(field);
+						}
+					}
+				}
+				catch (Exception e) 
+				{}
+			}
+		} 
+		catch (IOException e1) 
+		{
+		}
+		
 		return null;
 	}
+	
+	
+	
+	
+	
+	
 
 	private List<String> getValuesForName(String inputFieldId) {
 		if (!fieldValues.containsKey(inputFieldId)) {

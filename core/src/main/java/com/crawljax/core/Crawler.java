@@ -1,6 +1,8 @@
 package com.crawljax.core;
 
+import java.io.PrintWriter;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -11,8 +13,12 @@ import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
+import org.openqa.selenium.By;
 import org.openqa.selenium.ElementNotVisibleException;
 import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.NoSuchFrameException;
+import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +37,7 @@ import com.crawljax.core.state.StateFlowGraph;
 import com.crawljax.core.state.StateMachine;
 import com.crawljax.core.state.StateVertex;
 import com.crawljax.core.state.StateVertexFactory;
+import com.crawljax.core.state.StateVertexImpl;
 import com.crawljax.di.CoreModule.CandidateElementExtractorFactory;
 import com.crawljax.di.CoreModule.FormHandlerFactory;
 import com.crawljax.forms.FormHandler;
@@ -108,6 +115,7 @@ public class Crawler {
 		context.setStateMachine(stateMachine);
 		crawlpath = new CrawlPath();
 		context.setCrawlPath(crawlpath);
+		browser.reset();
 		browser.goToUrl(url);
 		plugins.runOnUrlLoadPlugins(context);
 		crawlDepth.set(0);
@@ -226,6 +234,7 @@ public class Crawler {
 		}
 		boolean isFired = false;
 		try {
+			makeSureElementVisible(eventToFire);
 			isFired = browser.fireEventAndWait(eventToFire);
 		} catch (ElementNotVisibleException | NoSuchElementException e) {
 			if (crawlRules.isCrawlHiddenAnchors() && eventToFire.getElement() != null
@@ -234,6 +243,8 @@ public class Crawler {
 			} else {
 				LOG.debug("Ignoring invisble element {}", eventToFire.getElement());
 			}
+			
+			//return isFired;
 		} catch (InterruptedException e) {
 			LOG.debug("Interrupted during fire event");
 			Thread.currentThread().interrupt();
@@ -256,6 +267,54 @@ public class Crawler {
 			        crawlpath.immutableCopyWithoutLast());
 			return false; // no event fired
 		}
+	}
+	
+	private void makeSureElementVisible(Eventable eventToFire)
+	{
+		try 
+		{
+			boolean handleChanged = false;
+			
+			if (eventToFire.getRelatedFrame() != null && !eventToFire.getRelatedFrame().equals("")) 
+			{
+				try 
+				{
+					browser.switchToFrame(eventToFire.getRelatedFrame());
+				} 
+				catch (NoSuchFrameException e) 
+				{
+					LOG.error("Frame not found, possibily while back-tracking..", e);
+				}
+				
+				handleChanged = true;
+			}
+
+			WebElement webElement = browser.getWebElement(eventToFire.getIdentification());
+			
+			makeSureElementVisible(webElement);
+
+			if (handleChanged) 
+				browser.getBrowser().switchTo().defaultContent();
+		}
+		catch (Exception ex) 
+		{
+			System.out.println("-----\r\n" + browser.getStrippedDom() + "\r\n--------------");
+			
+			LOG.error(ex.toString(), ex);
+			LOG.error(eventToFire.toString());
+		} 
+	}
+	
+	private void makeSureElementVisible(WebElement webElement)
+	{
+		if (webElement == null || webElement.isDisplayed())
+			return;
+		
+		String js = "arguments[0].style.height='auto'; arguments[0].style.visibility='visible';arguments[0].style.display='block';arguments[0].style.opacity=1;";
+		browser.executeJavaScript(js, webElement);
+		
+		WebElement parent = webElement.findElement(By.xpath(".."));
+		makeSureElementVisible(parent);
 	}
 
 	private Eventable resolveByXpath(Eventable eventable, Eventable eventToFire) {
@@ -281,7 +340,7 @@ public class Crawler {
 	private boolean visitAnchorHrefIfPossible(Eventable eventable) {
 		Element element = eventable.getElement();
 		String href = element.getAttributeOrNull("href");
-		if (href == null) {
+		if (href == null || href.trim().length() == 0 || "#".equals(href)) {
 			LOG.info("Anchor {} has no href and is invisble so it will be ignored", element);
 		} else {
 			LOG.info("Found an invisible link with href={}", href);
@@ -305,32 +364,35 @@ public class Crawler {
 		boolean interrupted = Thread.interrupted();
 		CandidateCrawlAction action =
 		        candidateActionCache.pollActionOrNull(stateMachine.getCurrentState());
-		while (action != null && !interrupted) {
+		while (action != null && !interrupted) 
+		{
 			CandidateElement element = action.getCandidateElement();
-			if (element.allConditionsSatisfied(browser)) {
+			if (element.allConditionsSatisfied(browser)) 
+			{
 				Eventable event = new Eventable(element, action.getEventType());
 				handleInputElements(event);
 				waitForRefreshTagIfAny(event);
-
+				
 				boolean fired = fireEvent(event);
-				if (fired) {
+				if (fired) 
 					inspectNewState(event);
-				}
-			} else {
-				LOG.info(
-				        "Element {} not clicked because not all crawl conditions where satisfied",
-				        element);
+			} 
+			else 
+			{
+				LOG.info("Element {} not clicked because not all crawl conditions where satisfied",  element);
 			}
+			
 			// We have to check if we are still in the same state.
 			action = candidateActionCache.pollActionOrNull(stateMachine.getCurrentState());
 			interrupted = Thread.interrupted();
-			if (!interrupted && crawlerLeftDomain()) {
-				/*
-				 * It's okay to have left the domain because the action didn't complete due to an
-				 * interruption.
-				 */
-				throw new CrawlerLeftDomainException(browser.getCurrentUrl());
-			}
+//			if (!interrupted && crawlerLeftDomain()) 
+//			{
+//				/*
+//				 * It's okay to have left the domain because the action didn't complete due to an
+//				 * interruption.
+//				 */
+//				throw new CrawlerLeftDomainException(browser.getCurrentUrl());
+//			}
 		}
 		if (interrupted) {
 			LOG.info("Interrupted while firing actions. Putting back the actions on the todo list");
@@ -348,11 +410,30 @@ public class Crawler {
 			goBackOneState();
 		} else {
 			StateVertex newState = stateMachine.newStateFor(browser);
+			
+			saveStateVertex(newState);
 			if (domChanged(event, newState)) {
 				inspectNewDom(event, newState);
 			} else {
 				LOG.debug("Dom unchanged");
 			}
+		}
+	}
+	
+	private void saveStateVertex(StateVertex state)
+	{
+		try
+		{
+			PrintWriter out = new PrintWriter(String.format("d:\\temp\\output\\%d.html", state.getId()));
+			out.println("id=" + state.getId());
+			out.println(state.getUrl());
+			out.println(state.getStrippedDom());
+			out.println(((StateVertexImpl)state).getTagDom());
+			out.close();
+		}
+		catch(Exception ex)
+		{
+			
 		}
 	}
 
@@ -405,7 +486,8 @@ public class Crawler {
 	}
 
 	private boolean crawlerLeftDomain() {
-		return !UrlUtils.isSameDomain(browser.getCurrentUrl(), url);
+		//return !UrlUtils.isSameDomain(browser.getCurrentUrl(), url);
+		return false;
 	}
 
 	private long parseWaitTimeOrReturnDefault(Matcher m) {
